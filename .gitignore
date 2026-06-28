@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+Thumbs.db
+coffee_activity_generator/exports/*.png
+coffee_activity_generator/exports/*.svg
+coffee_activity_generator/exports/*.pdf
