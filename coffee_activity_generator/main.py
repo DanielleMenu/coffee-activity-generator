@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Callable
 
@@ -21,7 +22,7 @@ from .generators.spot_difference import generate_spot_difference
 from .generators.wordsearch import generate_wordsearch
 
 
-Generator = Callable[[int | None, Path], tuple[Path, Path]]
+Generator = Callable[[int | None, Path], Iterable[Path]]
 
 GENERATORS: dict[str, Generator] = {
     "maze": generate_maze,
@@ -59,9 +60,17 @@ def main() -> None:
 
     names = list(GENERATORS.keys()) if args.activity == "all" else [args.activity]
     for idx, name in enumerate(names):
-        svg_path, png_path = GENERATORS[name](args.seed + idx, output_dir)
+        result = GENERATORS[name](args.seed + idx, output_dir)
+        svg_path, png_path = result
         generated_pngs.append(png_path)
         print(f"{name}: {svg_path} | {png_path}")
+
+        answer_key_svg = getattr(result, "answer_key_svg_path", None)
+        answer_key_png = getattr(result, "answer_key_png_path", None)
+        if answer_key_svg is not None:
+            print(f"{name} answer key SVG: {answer_key_svg}")
+        if answer_key_png is not None:
+            print(f"{name} answer key PNG: {answer_key_png}")
 
     if args.pdf:
         pdf_path = output_dir / "coffee_activity_book.pdf"

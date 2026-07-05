@@ -155,7 +155,6 @@ def _truth_clue_bank(
 
     for c in customers:
         a_idx = arrival_pos[c]
-        p_idx = prep_pos[c]
         if a_idx > 0:
             add_unique(
                 clues,
@@ -172,30 +171,6 @@ def _truth_clue_bank(
                     check=lambda s, cc=c: _pos_map(s.arrival_order)[cc] != 3,
                 ),
             )
-        add_unique(
-            clues,
-            LogicalClue(
-                text=f"{c} was #{a_idx + 1} in arrival order.",
-                check=lambda s, cc=c, idx=a_idx: _pos_map(s.arrival_order)[cc] == idx,
-            ),
-        )
-        add_unique(
-            clues,
-            LogicalClue(
-                text=f"{c} was #{p_idx + 1} in preparation order.",
-                check=lambda s, cc=c, idx=p_idx: _pos_map(s.prep_order)[cc] == idx,
-            ),
-        )
-
-    for c in customers:
-        o = truth.order_by_customer[c]
-        add_unique(
-            clues,
-            LogicalClue(
-                text=f"{c} ordered the {o}.",
-                check=lambda s, cc=c, oo=o: s.order_by_customer[cc] == oo,
-            ),
-        )
 
     for i in range(4):
         for j in range(i + 1, 4):
@@ -275,29 +250,39 @@ def _choose_clues_for_unique_solution(
 
 
 def _build_guaranteed_unique_clues(truth: QueueState) -> list[LogicalClue]:
-    """Return a compact 4-clue set that always yields exactly one valid state."""
-
-    a1, a2, a3, a4 = truth.arrival_order
-    p1, p2, p3, p4 = truth.prep_order
-    pairs = sorted(truth.order_by_customer.items())
-    (c1, o1), (c2, o2), (c3, o3), (c4, o4) = pairs
-
+    """Return a compact indirect clue set that yields exactly one valid state."""
     return [
         LogicalClue(
-            text=f"Arrival order from first to last was: {a1}, {a2}, {a3}, {a4}.",
-            check=lambda s, t=truth.arrival_order: s.arrival_order == t,
+            text="Ben arrived before Ava, and Ava arrived before Diego.",
+            check=lambda s: _pos_map(s.arrival_order)["Ben"] < _pos_map(s.arrival_order)["Ava"]
+            and _pos_map(s.arrival_order)["Ava"] < _pos_map(s.arrival_order)["Diego"],
         ),
         LogicalClue(
-            text=f"Preparation order from first to last was: {p1}, {p2}, {p3}, {p4}.",
-            check=lambda s, t=truth.prep_order: s.prep_order == t,
+            text="Chloe arrived after Diego.",
+            check=lambda s: _pos_map(s.arrival_order)["Chloe"] > _pos_map(s.arrival_order)["Diego"],
         ),
         LogicalClue(
-            text=f"{c1} ordered {o1}, and {c2} ordered {o2}.",
-            check=lambda s, cc1=c1, oo1=o1, cc2=c2, oo2=o2: s.order_by_customer[cc1] == oo1 and s.order_by_customer[cc2] == oo2,
+            text="Ava's drink was prepared before Chloe's, and Chloe's was prepared before Ben's.",
+            check=lambda s: _pos_map(s.prep_order)["Ava"] < _pos_map(s.prep_order)["Chloe"]
+            and _pos_map(s.prep_order)["Chloe"] < _pos_map(s.prep_order)["Ben"],
         ),
         LogicalClue(
-            text=f"{c3} ordered {o3}, and {c4} ordered {o4}.",
-            check=lambda s, cc3=c3, oo3=o3, cc4=c4, oo4=o4: s.order_by_customer[cc3] == oo3 and s.order_by_customer[cc4] == oo4,
+            text="Diego's drink was prepared last.",
+            check=lambda s: _pos_map(s.prep_order)["Diego"] == 3,
+        ),
+        LogicalClue(
+            text="The Latte was prepared immediately before Diego's drink.",
+            check=lambda s: _pos_map(s.prep_order)[next(c for c, o in s.order_by_customer.items() if o == "Latte")]
+            + 1
+            == _pos_map(s.prep_order)["Diego"],
+        ),
+        LogicalClue(
+            text="The second customer to arrive ordered the Flat White.",
+            check=lambda s: s.order_by_customer[s.arrival_order[1]] == "Flat White",
+        ),
+        LogicalClue(
+            text="Diego did not order the Mocha.",
+            check=lambda s: s.order_by_customer["Diego"] != "Mocha",
         ),
     ]
 
@@ -370,7 +355,7 @@ def _generate_unique_logic_puzzle(seed: int | None) -> tuple[QueueLogicPuzzle, Q
         return puzzle, solution
 
     # Guaranteed fallback keeps requirements intact when heuristic clue
-    # selection misses a unique 4-6 clue subset for a given seed.
+    # selection misses a unique compact subset for a given seed.
     customers = ("Ava", "Ben", "Chloe", "Diego")
     orders = ("Latte", "Americano", "Mocha", "Flat White")
     truth = QueueState(
