@@ -40,6 +40,7 @@ class Circle:
     center: Point
     radius: float
     width: float = 2.0
+    fill: bool = False
 
 
 @dataclass(slots=True)

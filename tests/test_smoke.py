@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from coffee_activity_generator.generators.connect_dots import generate_connect_dots
 from coffee_activity_generator.main import GENERATORS
 from coffee_activity_generator.generators.wordsearch import generate_wordsearch
 
@@ -19,3 +20,9 @@ def test_wordsearch_exports_answer_key(tmp_path: Path) -> None:
     assert result.answer_key_png_path.exists()
     assert result.answer_key_svg_path.suffix == ".svg"
     assert result.answer_key_png_path.suffix == ".png"
+
+
+def test_connect_dots_exports_pdf(tmp_path: Path) -> None:
+    result = generate_connect_dots(42, tmp_path)
+    assert result.pdf_path.exists()
+    assert result.pdf_path.suffix == ".pdf"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image
 import svgwrite
@@ -40,7 +42,7 @@ def render_svg(art: Artwork, output_path: Path, cfg: PageConfig) -> None:
             dwg.circle(
                 center=(cx, cy),
                 r=circle.radius * cfg.width_px,
-                fill="none",
+                fill="black" if circle.fill else "none",
                 stroke="black",
                 stroke_width=circle.width,
             )
@@ -82,7 +84,14 @@ def render_png(art: Artwork, output_path: Path, cfg: PageConfig) -> None:
         ax.plot(xs, ys, color="black", linewidth=path.width / 2)
 
     for circle in art.circles:
-        patch = plt.Circle(circle.center, radius=circle.radius, fill=False, edgecolor="black", linewidth=circle.width / 2)
+        patch = plt.Circle(
+            circle.center,
+            radius=circle.radius,
+            fill=circle.fill,
+            facecolor="black" if circle.fill else "none",
+            edgecolor="black",
+            linewidth=circle.width / 2,
+        )
         ax.add_patch(patch)
 
     for label in art.labels:

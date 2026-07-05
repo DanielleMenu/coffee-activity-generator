@@ -67,10 +67,13 @@ def main() -> None:
 
         answer_key_svg = getattr(result, "answer_key_svg_path", None)
         answer_key_png = getattr(result, "answer_key_png_path", None)
+        pdf_path = getattr(result, "pdf_path", None)
         if answer_key_svg is not None:
             print(f"{name} answer key SVG: {answer_key_svg}")
         if answer_key_png is not None:
             print(f"{name} answer key PNG: {answer_key_png}")
+        if pdf_path is not None:
+            print(f"{name} PDF: {pdf_path}")
 
     if args.pdf:
         pdf_path = output_dir / "coffee_activity_book.pdf"
