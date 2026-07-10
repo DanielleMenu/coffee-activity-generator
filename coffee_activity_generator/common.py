@@ -58,6 +58,9 @@ class Label:
     text: str
     size: int = 14
     anchor: Anchor = "start"
+    font_family: str = "Courier New"
+    font_weight: str = "normal"
+    png_scale: float = 0.65
 
 
 @dataclass(slots=True)

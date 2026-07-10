@@ -82,46 +82,59 @@ def _place_words(grid: np.ndarray, words: list[str], rng: np.random.Generator) -
     return placements
 
 
-def _draw_grid_artwork(grid: np.ndarray) -> tuple[Artwork, float, float, float, float]:
+def _draw_grid_artwork(grid: np.ndarray) -> tuple[Artwork, float, float, float, float, float]:
     size = grid.shape[0]
     art = Artwork(title="", subtitle="")
 
-    # Use a square letter area centered on the 6x9 page, with no visible table.
-    w = 0.82
-    x0 = (1.0 - w) / 2.0
-    cell = w / size
+    # Typography/style requested for this puzzle export.
+    letter_size = 24
+    font_family = '"Avenir Next","Aptos","Futura",sans-serif'
+    font_weight = "700"
 
-    # Render a compact alternate layout by halving row-to-row spacing.
-    row_step = cell * 0.5
-    total_h = (size - 1) * row_step + cell
+    # Space letters by multipliers relative to character metrics in print units.
+    # Approximate uppercase width for this heavier sans style is closer to 0.9em.
+    page_w_in = 6.0
+    page_h_in = 9.0
+    letter_in = letter_size / 72.0
+    char_width_in = letter_in * 0.9
+    x_step = (char_width_in * 1.1) / page_w_in
+    row_step = ((letter_in * 1.2) / page_h_in) * 0.6
+
+    total_w = (size - 1) * x_step
+    total_h = (size - 1) * row_step
+    x0 = (1.0 - total_w) / 2.0
     y0 = (1.0 - total_h) / 2.0
-    letter_size = int((min(cell, row_step) * 1800) * 0.58)
+
+    baseline_nudge = (letter_in * 0.35) / page_h_in
 
     for r in range(size):
         for c in range(size):
             art.labels.append(
                 Label(
-                    (x0 + c * cell + cell * 0.5, y0 + r * row_step + cell * 0.57),
+                    (x0 + c * x_step, y0 + r * row_step + baseline_nudge),
                     str(grid[r, c]),
                     size=letter_size,
                     anchor="middle",
+                    font_family=font_family,
+                    font_weight=font_weight,
+                    png_scale=1.0,
                 )
             )
 
-    return art, x0, y0, cell, row_step
+    return art, x0, y0, x_step, row_step, baseline_nudge
 
 
 def _draw_answer_key_artwork(grid: np.ndarray, placements: list[WordPlacement]) -> Artwork:
-    art, x0, y0, cell, row_step = _draw_grid_artwork(grid)
+    art, x0, y0, x_step, row_step, baseline_nudge = _draw_grid_artwork(grid)
     art.labels.append(Label((0.5, 0.07), "ANSWER KEY", size=20, anchor="middle"))
 
     for placement in placements:
         start = placement.cells[0]
         end = placement.cells[-1]
-        sx = x0 + start[0] * cell + cell * 0.5
-        sy = y0 + start[1] * row_step + cell * 0.57
-        ex = x0 + end[0] * cell + cell * 0.5
-        ey = y0 + end[1] * row_step + cell * 0.57
+        sx = x0 + start[0] * x_step
+        sy = y0 + start[1] * row_step + baseline_nudge
+        ex = x0 + end[0] * x_step
+        ey = y0 + end[1] * row_step + baseline_nudge
         art.paths.append(StrokePath(points=[(sx, sy), (ex, ey)], width=3.0))
 
     return art
@@ -150,7 +163,7 @@ def generate_wordsearch(seed: int | None, output_dir: Path) -> WordSearchResult:
     empties = np.where(grid == "")
     grid[empties] = alphabet[rng.integers(0, len(alphabet), size=len(empties[0]))]
 
-    puzzle_art, _, _, _, _ = _draw_grid_artwork(grid)
+    puzzle_art, _, _, _, _, _ = _draw_grid_artwork(grid)
     answer_key_art = _draw_answer_key_artwork(grid, placements)
     svg_path, png_path = export_artwork(puzzle_art, "wordsearch", output_dir)
     answer_key_svg_path, answer_key_png_path = export_artwork(answer_key_art, "wordsearch_answer_key", output_dir)

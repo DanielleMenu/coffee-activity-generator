@@ -7,10 +7,39 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from PIL import Image
 import svgwrite
 
 from .common import Artwork, PageConfig
+
+
+_FONT_CACHE: dict[str, str] = {}
+
+
+def _resolve_png_font_family(font_family: str) -> str:
+    if font_family in _FONT_CACHE:
+        return _FONT_CACHE[font_family]
+
+    candidates = [name.strip() for name in font_family.split(",") if name.strip()]
+    for candidate in candidates:
+        if candidate.lower() in {"sans-serif", "sans", "serif", "monospace"}:
+            continue
+        try:
+            font_manager.findfont(font_manager.FontProperties(family=candidate), fallback_to_default=False)
+            _FONT_CACHE[font_family] = candidate
+            return candidate
+        except ValueError:
+            continue
+
+    _FONT_CACHE[font_family] = "DejaVu Sans"
+    return "DejaVu Sans"
+
+
+def _resolve_png_font_weight(font_weight: str) -> str:
+    if font_weight == "500":
+        return "normal"
+    return font_weight
 
 
 def _to_px(x: float, y: float, cfg: PageConfig) -> tuple[float, float]:
@@ -57,7 +86,8 @@ def render_svg(art: Artwork, output_path: Path, cfg: PageConfig) -> None:
                 insert=(x, y),
                 fill="black",
                 font_size=label.size,
-                font_family="Courier New",
+                font_family=label.font_family,
+                font_weight=label.font_weight,
                 text_anchor=anchors[label.anchor],
             )
         )
@@ -69,6 +99,7 @@ def render_png(art: Artwork, output_path: Path, cfg: PageConfig) -> None:
     """Render a raster PNG from the same primitives using Matplotlib."""
 
     fig, ax = plt.subplots(figsize=(cfg.width_in, cfg.height_in), dpi=cfg.dpi)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
     fig.patch.set_facecolor("white")
     ax.set_xlim(0, 1)
     ax.set_ylim(1, 0)
@@ -102,12 +133,13 @@ def render_png(art: Artwork, output_path: Path, cfg: PageConfig) -> None:
             label.text,
             ha=ha,
             va="center",
-            fontsize=label.size * 0.65,
-            family="DejaVu Sans Mono",
+            fontsize=label.size * label.png_scale,
+            family=_resolve_png_font_family(label.font_family),
+            fontweight=_resolve_png_font_weight(label.font_weight),
             color="black",
         )
 
-    fig.savefig(output_path, dpi=cfg.dpi, bbox_inches="tight", pad_inches=0)
+    fig.savefig(output_path, dpi=cfg.dpi)
     plt.close(fig)
 
     # Convert to strict black and white for cleaner print output.
