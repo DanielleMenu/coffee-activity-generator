@@ -9,31 +9,52 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
+import sys
 
 import numpy as np
 
-from ..cli import run_generator_cli
-from ..common import Artwork, Label, StrokePath, seeded_rng
-from ..render import export_artwork
+try:
+    from ..cli import run_generator_cli
+    from ..common import Artwork, Label, PageConfig, StrokePath, seeded_rng
+    from ..render import render_svg
+except ImportError:
+    # Allow direct execution: python coffee_activity_generator/generators/wordsearch.py
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    from coffee_activity_generator.cli import run_generator_cli
+    from coffee_activity_generator.common import Artwork, Label, PageConfig, StrokePath, seeded_rng
+    from coffee_activity_generator.render import render_svg
 
-WORDS = [
-    "AMERICANO",
-    "BEANS",
-    "BREW",
-    "CAPPUCCINO",
+DEFAULT_WORDS = [
+    "AFFOGATO",
+    "BAGEL",
+    "BROWNIE",
+    "CHAI",
+    "CHEESECAKE",
     "CROISSANT",
-    "FOAM",
-    "LAPTOP",
+    "ESPRESSO",
+    "FOCACCIA",
     "LATTE",
     "MUFFIN",
-    "MUG",
-    "NAPKIN",
-    "OATMILK",
-    "OUTLET",
-    "ROAST",
-    "WIFI",
-    "PRODUCTIVITY",
+    "SCONE",
+    "WAFFLE",
+    "QUICHE",
+    "COOKIE",
+    "SANDWICH",
+    "VEGETABLES",
 ]
+
+WORDS_FILE = Path(__file__).with_name("wordsearch_words.txt")
+
+
+def _load_words() -> list[str]:
+    if WORDS_FILE.exists():
+        words = [line.strip().upper() for line in WORDS_FILE.read_text(encoding="utf-8").splitlines()]
+        words = [word for word in words if word and not word.startswith("#")]
+        if words:
+            return words
+    return DEFAULT_WORDS
 
 
 @dataclass(slots=True)
@@ -45,11 +66,11 @@ class WordPlacement:
 @dataclass(slots=True)
 class WordSearchResult:
     svg_path: Path
-    png_path: Path
     answer_key_svg_path: Path
-    answer_key_png_path: Path
+    png_path: Path | None = None
+    answer_key_png_path: Path | None = None
 
-    def __iter__(self) -> Iterator[Path]:
+    def __iter__(self) -> Iterator[Path | None]:
         yield self.svg_path
         yield self.png_path
 
@@ -145,12 +166,13 @@ def generate_wordsearch(seed: int | None, output_dir: Path) -> WordSearchResult:
 
     rng = seeded_rng(seed)
     size = 14
+    words = _load_words()
 
     grid: np.ndarray | None = None
     for _ in range(32):
         candidate = np.full((size, size), "", dtype="U1")
         try:
-            placements = _place_words(candidate, WORDS, rng)
+            placements = _place_words(candidate, words, rng)
             grid = candidate
             break
         except RuntimeError:
@@ -165,14 +187,15 @@ def generate_wordsearch(seed: int | None, output_dir: Path) -> WordSearchResult:
 
     puzzle_art, _, _, _, _, _ = _draw_grid_artwork(grid)
     answer_key_art = _draw_answer_key_artwork(grid, placements)
-    svg_path, png_path = export_artwork(puzzle_art, "wordsearch", output_dir)
-    answer_key_svg_path, answer_key_png_path = export_artwork(answer_key_art, "wordsearch_answer_key", output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    svg_path = output_dir / "wordsearch.svg"
+    answer_key_svg_path = output_dir / "wordsearch_answer_key.svg"
+    render_svg(puzzle_art, svg_path, PageConfig())
+    render_svg(answer_key_art, answer_key_svg_path, PageConfig())
 
     return WordSearchResult(
         svg_path=svg_path,
-        png_path=png_path,
         answer_key_svg_path=answer_key_svg_path,
-        answer_key_png_path=answer_key_png_path,
     )
 
 

@@ -37,6 +37,20 @@ GENERATORS: dict[str, Generator] = {
 }
 
 
+def _extract_primary_paths(result: object) -> tuple[Path, Path | None]:
+    svg_path = getattr(result, "svg_path", None)
+    png_path = getattr(result, "png_path", None)
+    if isinstance(svg_path, Path):
+        return svg_path, png_path if isinstance(png_path, Path) else None
+
+    svg_path, png_path = result  # type: ignore[misc]
+    if not isinstance(svg_path, Path):
+        raise TypeError("Generator result must include a Path svg_path.")
+    if png_path is not None and not isinstance(png_path, Path):
+        raise TypeError("Generator png_path must be a Path or None.")
+    return svg_path, png_path
+
+
 def build_pdf(png_paths: list[Path], output_pdf: Path) -> None:
     """Create a 6x9 PDF booklet from generated PNG pages."""
 
@@ -61,9 +75,12 @@ def main() -> None:
     names = list(GENERATORS.keys()) if args.activity == "all" else [args.activity]
     for idx, name in enumerate(names):
         result = GENERATORS[name](args.seed + idx, output_dir)
-        svg_path, png_path = result
-        generated_pngs.append(png_path)
-        print(f"{name}: {svg_path} | {png_path}")
+        svg_path, png_path = _extract_primary_paths(result)
+        if png_path is not None:
+            generated_pngs.append(png_path)
+            print(f"{name}: {svg_path} | {png_path}")
+        else:
+            print(f"{name}: {svg_path}")
 
         answer_key_svg = getattr(result, "answer_key_svg_path", None)
         answer_key_png = getattr(result, "answer_key_png_path", None)
@@ -75,10 +92,12 @@ def main() -> None:
         if pdf_path is not None:
             print(f"{name} PDF: {pdf_path}")
 
-    if args.pdf:
+    if args.pdf and generated_pngs:
         pdf_path = output_dir / "coffee_activity_book.pdf"
         build_pdf(generated_pngs, pdf_path)
         print(f"PDF: {pdf_path}")
+    elif args.pdf:
+        print("PDF was requested, but no PNG outputs were generated.")
 
 
 if __name__ == "__main__":

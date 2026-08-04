@@ -77,6 +77,18 @@ python -m coffee_activity_generator.generators.wordsearch --seed 123
 python -m coffee_activity_generator.generators.floorplan --seed 123
 ```
 
+You can also run wordsearch directly:
+
+```bash
+python coffee_activity_generator/generators/wordsearch.py --seed 123
+```
+
+To customize the word list, edit:
+
+- `coffee_activity_generator/generators/wordsearch_words.txt`
+
+Wordsearch now exports SVG files only (`wordsearch.svg` and `wordsearch_answer_key.svg`).
+
 Outputs are written to `coffee_activity_generator/exports/` by default.
 
 ## Activity set

@@ -12,6 +12,20 @@ from .common import ensure_dir
 GeneratorFn = Callable[[int | None, Path], Iterable[Path]]
 
 
+def _extract_primary_paths(result: object) -> tuple[Path, Path | None]:
+    svg_path = getattr(result, "svg_path", None)
+    png_path = getattr(result, "png_path", None)
+    if isinstance(svg_path, Path):
+        return svg_path, png_path if isinstance(png_path, Path) else None
+
+    svg_path, png_path = result  # type: ignore[misc]
+    if not isinstance(svg_path, Path):
+        raise TypeError("Generator result must include a Path svg_path.")
+    if png_path is not None and not isinstance(png_path, Path):
+        raise TypeError("Generator png_path must be a Path or None.")
+    return svg_path, png_path
+
+
 def run_generator_cli(name: str, description: str, generator: GeneratorFn) -> None:
     """Build and run a simple standard CLI for any generator."""
 
@@ -26,9 +40,10 @@ def run_generator_cli(name: str, description: str, generator: GeneratorFn) -> No
     args = parser.parse_args()
     out_dir = ensure_dir(args.output_dir)
     result = generator(args.seed, out_dir)
-    svg_path, png_path = result
+    svg_path, png_path = _extract_primary_paths(result)
     print(f"SVG: {svg_path}")
-    print(f"PNG: {png_path}")
+    if png_path is not None:
+        print(f"PNG: {png_path}")
 
     answer_key_svg = getattr(result, "answer_key_svg_path", None)
     answer_key_png = getattr(result, "answer_key_png_path", None)

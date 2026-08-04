@@ -1,5 +1,8 @@
 """Coffee Activity Generator package."""
 
-from .main import main
+def main() -> None:
+	from .main import main as _main
+
+	_main()
 
 __all__ = ["main"]
