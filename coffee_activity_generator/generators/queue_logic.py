@@ -26,20 +26,77 @@ CUSTOMER_POOL = [
     "Hana",
     "Iris",
     "Jules",
+    "Kai",
+    "Lena",
+    "Maya",
+    "Noah",
+    "Olive",
+    "Parker",
+    "Quinn",
+    "Riley",
+    "Sam",
+    "Taylor",
+    "Uma",
+    "Victor",
+    "Willow",
+    "Xavier",
+    "Yara",
+    "Zoe",
+    "Alex",
+    "Casey",
+    "Jordan",
+    "Morgan",
 ]
 
-ORDER_POOL = [
+BASE_DRINKS = [
     "Latte",
-    "Americano",
     "Cappuccino",
-    "Mocha",
-    "Flat White",
+    "Americano",
     "Espresso",
-    "Cold Brew",
+    "Flat White",
+    "Mocha",
     "Macchiato",
-    "Chai Latte",
+    "Cold Brew",
     "Pour Over",
 ]
+
+MODIFIERS = [
+    "",
+    "",
+    "",
+    "Oat Milk",
+    "Soy Milk",
+    "Almond Milk",
+    "Extra Shot",
+    "Decaf",
+    "Iced",
+    "Half Sweet",
+    "Extra Hot",
+]
+
+SYRUPS = [
+    "",
+    "",
+    "",
+    "Vanilla",
+    "Caramel",
+    "Hazelnut",
+]
+
+
+def _build_order_pool() -> list[str]:
+    pool: list[str] = []
+    for base in BASE_DRINKS:
+        for modifier in MODIFIERS:
+            for syrup in SYRUPS:
+                parts = [part for part in (modifier, syrup, base) if part]
+                label = " ".join(parts)
+                if label not in pool:
+                    pool.append(label)
+    return pool
+
+
+ORDER_POOL = _build_order_pool()
 
 
 @dataclass(slots=True)
@@ -249,48 +306,46 @@ def _choose_clues_for_unique_solution(
     return selected
 
 
-def _build_guaranteed_unique_clues(truth: QueueState) -> list[LogicalClue]:
-    """Return a compact indirect clue set that yields exactly one valid state."""
-    return [
-        LogicalClue(
-            text="Ben arrived before Ava, and Ava arrived before Diego.",
-            check=lambda s: _pos_map(s.arrival_order)["Ben"] < _pos_map(s.arrival_order)["Ava"]
-            and _pos_map(s.arrival_order)["Ava"] < _pos_map(s.arrival_order)["Diego"],
-        ),
-        LogicalClue(
-            text="Chloe arrived after Diego.",
-            check=lambda s: _pos_map(s.arrival_order)["Chloe"] > _pos_map(s.arrival_order)["Diego"],
-        ),
-        LogicalClue(
-            text="Ava's drink was prepared before Chloe's, and Chloe's was prepared before Ben's.",
-            check=lambda s: _pos_map(s.prep_order)["Ava"] < _pos_map(s.prep_order)["Chloe"]
-            and _pos_map(s.prep_order)["Chloe"] < _pos_map(s.prep_order)["Ben"],
-        ),
-        LogicalClue(
-            text="Diego's drink was prepared last.",
-            check=lambda s: _pos_map(s.prep_order)["Diego"] == 3,
-        ),
-        LogicalClue(
-            text="The Latte was prepared immediately before Diego's drink.",
-            check=lambda s: _pos_map(s.prep_order)[next(c for c, o in s.order_by_customer.items() if o == "Latte")]
-            + 1
-            == _pos_map(s.prep_order)["Diego"],
-        ),
-        LogicalClue(
-            text="The second customer to arrive ordered the Flat White.",
-            check=lambda s: s.order_by_customer[s.arrival_order[1]] == "Flat White",
-        ),
-        LogicalClue(
-            text="Diego did not order the Mocha.",
-            check=lambda s: s.order_by_customer["Diego"] != "Mocha",
-        ),
-    ]
+def _choose_clues_greedy(
+    all_states: list[QueueState],
+    candidates: list[LogicalClue],
+    truth: QueueState,
+    max_clues: int,
+) -> list[LogicalClue]:
+    """Pick indirect clues that shrink the candidate set fastest while preserving truth."""
+
+    selected: list[LogicalClue] = []
+    survivors = all_states
+    remaining = list(candidates)
+
+    while len(selected) < max_clues and len(survivors) > 1 and remaining:
+        best_clue: LogicalClue | None = None
+        best_survivors: list[QueueState] | None = None
+
+        for clue in remaining:
+            next_survivors = [st for st in survivors if clue.check(st)]
+            if truth not in next_survivors or not next_survivors:
+                continue
+            if best_survivors is None or len(next_survivors) < len(best_survivors):
+                best_clue = clue
+                best_survivors = next_survivors
+
+        if best_clue is None or best_survivors is None or len(best_survivors) == len(survivors):
+            break
+
+        selected.append(best_clue)
+        survivors = best_survivors
+        remaining = [c for c in remaining if c.text != best_clue.text]
+
+    if len(survivors) == 1 and survivors[0] == truth and 4 <= len(selected) <= max_clues:
+        return selected
+    raise RuntimeError("Greedy clue selection did not reach a unique indirect solution.")
 
 
 def _generate_unique_logic_puzzle(seed: int | None) -> tuple[QueueLogicPuzzle, QueueLogicSolution]:
     rng = seeded_rng(seed)
 
-    for attempt in range(80):
+    for attempt in range(320):
         customers_sample = rng.choice(CUSTOMER_POOL, size=4, replace=False)
         orders_sample = rng.choice(ORDER_POOL, size=4, replace=False)
         customers = (str(customers_sample[0]), str(customers_sample[1]), str(customers_sample[2]), str(customers_sample[3]))
@@ -334,7 +389,15 @@ def _generate_unique_logic_puzzle(seed: int | None) -> tuple[QueueLogicPuzzle, Q
                 rng_seed=None if seed is None else seed + attempt,
             )
         except RuntimeError:
-            continue
+            try:
+                selected_clues = _choose_clues_greedy(
+                    all_states=all_states,
+                    candidates=candidates,
+                    truth=truth,
+                    max_clues=8,
+                )
+            except RuntimeError:
+                continue
 
         # Add one optional clue (up to total 6) if uniqueness remains unchanged.
         survivors = _filter_states(all_states, selected_clues)
@@ -354,33 +417,34 @@ def _generate_unique_logic_puzzle(seed: int | None) -> tuple[QueueLogicPuzzle, Q
         )
         return puzzle, solution
 
-    # Guaranteed fallback keeps requirements intact when heuristic clue
-    # selection misses a unique compact subset for a given seed.
-    customers = ("Ava", "Ben", "Chloe", "Diego")
-    orders = ("Latte", "Americano", "Mocha", "Flat White")
-    truth = QueueState(
-        arrival_order=("Ben", "Ava", "Diego", "Chloe"),
-        prep_order=("Ava", "Chloe", "Ben", "Diego"),
-        order_by_customer={
-            "Ava": "Flat White",
-            "Ben": "Latte",
-            "Chloe": "Mocha",
-            "Diego": "Americano",
-        },
-    )
-    clues = _build_guaranteed_unique_clues(truth)
-    all_states = _enumerate_states(customers, orders)
-    survivors = _filter_states(all_states, clues)
-    if len(survivors) != 1 or survivors[0] != truth:
-        raise RuntimeError("Fallback queue logic puzzle did not produce a unique solution.")
+    raise RuntimeError("Could not generate an indirect unique queue logic puzzle.")
 
-    puzzle = QueueLogicPuzzle(customers=customers, coffee_orders=orders, clues=[c.text for c in clues])
-    solution = QueueLogicSolution(
-        arrival_order=truth.arrival_order,
-        prep_order=truth.prep_order,
-        order_by_customer=truth.order_by_customer,
-    )
-    return puzzle, solution
+
+def _format_puzzle_text(puzzle: QueueLogicPuzzle) -> str:
+    lines: list[str] = []
+    lines.append("Queue Logic Puzzle")
+    lines.append("")
+    lines.append("Patrons:")
+    for name in puzzle.customers:
+        lines.append(f"- {name}")
+    lines.append("")
+    lines.append("Orders:")
+    for order in puzzle.coffee_orders:
+        lines.append(f"- {order}")
+    lines.append("")
+    lines.append("Clues:")
+    for i, clue in enumerate(puzzle.clues, start=1):
+        lines.append(f"{i}. {clue}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def generate_queue_logic_text(seed: int | None, output_dir: Path, stem: str = "queue_logic") -> Path:
+    puzzle, _solution = _generate_unique_logic_puzzle(seed)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    txt_path = output_dir / f"{stem}.txt"
+    txt_path.write_text(_format_puzzle_text(puzzle), encoding="utf-8")
+    return txt_path
 
 
 def _draw_printable_puzzle(puzzle: QueueLogicPuzzle) -> Artwork:
@@ -436,9 +500,15 @@ def generate_queue_logic(seed: int | None, output_dir: Path) -> QueueLogicResult
 
 def _main() -> None:
     parser = argparse.ArgumentParser(description="Generate coffee queue logic puzzles.")
-    parser.add_argument("--seed", type=int, default=7, help="Random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility (omit for a fresh random puzzle)")
     parser.add_argument("--output-dir", type=Path, default=Path("coffee_activity_generator/exports"))
+    parser.add_argument("--text-only", action="store_true", help="Export only a text puzzle file")
     args = parser.parse_args()
+
+    if args.text_only:
+        txt_path = generate_queue_logic_text(seed=args.seed, output_dir=args.output_dir)
+        print(f"TXT: {txt_path}")
+        return
 
     result = generate_queue_logic(seed=args.seed, output_dir=args.output_dir)
     print(f"SVG: {result.svg_path}")

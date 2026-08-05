@@ -1,0 +1,23 @@
+Queue Logic Puzzle
+
+Patrons:
+- Iris
+- Hana
+- Quinn
+- Victor
+
+Orders:
+- Almond Milk Espresso
+- Extra Hot Cold Brew
+- Cold Brew
+- Almond Milk Vanilla Mocha
+
+Clues:
+1. The second customer to arrive ordered the Almond Milk Espresso.
+2. The last drink prepared belonged to the customer who ordered Cold Brew.
+3. Hana arrived before Iris.
+4. Iris arrived before Quinn.
+5. Victor arrived before Hana.
+6. Iris's drink was prepared before Hana's.
+7. Quinn's drink was prepared before Iris's.
+8. The Extra Hot Cold Brew was prepared before the Almond Milk Vanilla Mocha.

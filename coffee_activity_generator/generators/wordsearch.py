@@ -7,6 +7,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Iterator
 import sys
@@ -27,34 +28,41 @@ except ImportError:
     from coffee_activity_generator.render import render_svg
 
 DEFAULT_WORDS = [
-    "AFFOGATO",
-    "BAGEL",
-    "BROWNIE",
-    "CHAI",
-    "CHEESECAKE",
-    "CROISSANT",
+    "AMERICANO",
+    "BEANS",
+    "BREW",
+    "CAPPUCCINO",
+    "CORTADO",
+    "CREAM",
     "ESPRESSO",
-    "FOCACCIA",
-    "LATTE",
-    "MUFFIN",
-    "SCONE",
-    "WAFFLE",
-    "QUICHE",
-    "COOKIE",
-    "SANDWICH",
-    "VEGETABLES",
+    "FILTER",
+    "FLATWHITE",
+    "MACCHIATO",
+    "MOCHA",
+    "OATMILK",
+    "ROAST",
+    "GRINDER",
+    "SYRUP",
+    "DECAF"
 ]
 
 WORDS_FILE = Path(__file__).with_name("wordsearch_words.txt")
 
 
-def _load_words() -> list[str]:
+def _normalize_words(words: list[str]) -> list[str]:
+    cleaned = [word.strip().upper() for word in words]
+    return [word for word in cleaned if word and not word.startswith("#")]
+
+
+def _load_words() -> tuple[list[str], str]:
+    script_words = _normalize_words(DEFAULT_WORDS)
+
     if WORDS_FILE.exists():
-        words = [line.strip().upper() for line in WORDS_FILE.read_text(encoding="utf-8").splitlines()]
-        words = [word for word in words if word and not word.startswith("#")]
-        if words:
-            return words
-    return DEFAULT_WORDS
+        file_words = _normalize_words(WORDS_FILE.read_text(encoding="utf-8").splitlines())
+        if file_words:
+            return file_words, str(WORDS_FILE)
+
+    return script_words, "DEFAULT_WORDS in wordsearch.py"
 
 
 @dataclass(slots=True)
@@ -101,6 +109,34 @@ def _place_words(grid: np.ndarray, words: list[str], rng: np.random.Generator) -
             raise RuntimeError(f"Could not place word: {word}")
 
     return placements
+
+
+def _estimate_grid_size(words: list[str]) -> int:
+    longest = max(len(word) for word in words)
+    total_letters = sum(len(word) for word in words)
+    area_estimate = int(math.ceil(math.sqrt(total_letters * 1.8)))
+    return max(14, longest, area_estimate)
+
+
+def _build_grid(words: list[str], rng: np.random.Generator) -> tuple[np.ndarray, list[WordPlacement]]:
+    ordered_words = sorted(words, key=len, reverse=True)
+    base_size = _estimate_grid_size(ordered_words)
+    max_size = max(base_size + 6, 20)
+
+    for size in range(base_size, max_size + 1):
+        for _ in range(64):
+            candidate = np.full((size, size), "", dtype="U1")
+            try:
+                placements = _place_words(candidate, ordered_words, rng)
+                return candidate, placements
+            except RuntimeError:
+                continue
+
+    raise RuntimeError(
+        "Could not place all words in the word-search grid. "
+        f"Tried sizes {base_size}..{max_size} for {len(words)} words; "
+        f"longest word has {max(len(word) for word in words)} letters."
+    )
 
 
 def _draw_grid_artwork(grid: np.ndarray) -> tuple[Artwork, float, float, float, float, float]:
@@ -165,21 +201,8 @@ def generate_wordsearch(seed: int | None, output_dir: Path) -> WordSearchResult:
     """Generate a coffee-themed printable word-search."""
 
     rng = seeded_rng(seed)
-    size = 14
-    words = _load_words()
-
-    grid: np.ndarray | None = None
-    for _ in range(32):
-        candidate = np.full((size, size), "", dtype="U1")
-        try:
-            placements = _place_words(candidate, words, rng)
-            grid = candidate
-            break
-        except RuntimeError:
-            continue
-
-    if grid is None:
-        raise RuntimeError("Could not place all words in the word-search grid.")
+    words, words_source = _load_words()
+    grid, placements = _build_grid(words, rng)
 
     alphabet = np.array(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
     empties = np.where(grid == "")
@@ -190,8 +213,14 @@ def generate_wordsearch(seed: int | None, output_dir: Path) -> WordSearchResult:
     output_dir.mkdir(parents=True, exist_ok=True)
     svg_path = output_dir / "wordsearch.svg"
     answer_key_svg_path = output_dir / "wordsearch_answer_key.svg"
+    # Clean up legacy PNG outputs from older versions to avoid stale-file confusion.
+    legacy_png_paths = [output_dir / "wordsearch.png", output_dir / "wordsearch_answer_key.png"]
+    for legacy_png in legacy_png_paths:
+        if legacy_png.exists():
+            legacy_png.unlink()
     render_svg(puzzle_art, svg_path, PageConfig())
     render_svg(answer_key_art, answer_key_svg_path, PageConfig())
+    print(f"Words source: {words_source}")
 
     return WordSearchResult(
         svg_path=svg_path,

@@ -1,0 +1,23 @@
+Queue Logic Puzzle
+
+Patrons:
+- Olive
+- Diego
+- Willow
+- Jules
+
+Orders:
+- Decaf Caramel Cold Brew
+- Decaf Macchiato
+- Extra Shot Hazelnut Cold Brew
+- Extra Hot Cappuccino
+
+Clues:
+1. The second customer to arrive ordered the Decaf Macchiato.
+2. The last drink prepared belonged to the customer who ordered Decaf Macchiato.
+3. Diego arrived before Olive.
+4. Olive arrived before Jules.
+5. Olive's drink was prepared before Jules's.
+6. Willow's drink was prepared before Olive's.
+7. The Decaf Caramel Cold Brew was prepared before the Extra Shot Hazelnut Cold Brew.
+8. The Extra Shot Hazelnut Cold Brew was prepared before the Extra Hot Cappuccino.

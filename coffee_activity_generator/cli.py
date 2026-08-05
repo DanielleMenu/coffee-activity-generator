@@ -41,16 +41,16 @@ def run_generator_cli(name: str, description: str, generator: GeneratorFn) -> No
     out_dir = ensure_dir(args.output_dir)
     result = generator(args.seed, out_dir)
     svg_path, png_path = _extract_primary_paths(result)
-    print(f"SVG: {svg_path}")
+    print(f"SVG: {svg_path.resolve()}")
     if png_path is not None:
-        print(f"PNG: {png_path}")
+        print(f"PNG: {png_path.resolve()}")
 
     answer_key_svg = getattr(result, "answer_key_svg_path", None)
     answer_key_png = getattr(result, "answer_key_png_path", None)
     pdf_path = getattr(result, "pdf_path", None)
     if answer_key_svg is not None:
-        print(f"Answer key SVG: {answer_key_svg}")
+        print(f"Answer key SVG: {answer_key_svg.resolve()}")
     if answer_key_png is not None:
-        print(f"Answer key PNG: {answer_key_png}")
+        print(f"Answer key PNG: {answer_key_png.resolve()}")
     if pdf_path is not None:
-        print(f"PDF: {pdf_path}")
+        print(f"PDF: {pdf_path.resolve()}")

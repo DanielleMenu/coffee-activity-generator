@@ -16,7 +16,20 @@ from ..common import Artwork, Label, StrokePath, seeded_rng
 from ..render import export_artwork
 
 Difficulty = Literal["easy", "medium", "hard"]
-MazeShape = Literal["coffee-cup", "rectangle"]
+MazeShape = Literal[
+    "coffee-cup",
+    "coffee-bean",
+    "coffee-pot",
+    "croissant",
+    "muffin",
+    "milk-pitcher",
+    "notebook",
+    "headphones",
+    "laptop",
+    "sun",
+    "circle",
+    "rectangle",
+]
 Cell = tuple[int, int]
 Edge = frozenset[Cell]
 
@@ -89,6 +102,229 @@ def _coffee_cup_mask(width: int, height: int) -> set[Cell]:
             if cup_body or top_band or base_band or handle or bridge:
                 valid.add((x, y))
     return valid
+
+
+def _coffee_bean_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            dx = nx - 0.50
+            dy = ny - 0.54
+            outer = (dx * dx) / (0.28 * 0.28) + (dy * dy) / (0.38 * 0.38) <= 1.0
+            if not outer:
+                continue
+
+            # Subtle center pinch to suggest bean profile while keeping connectivity.
+            pinch = abs(dx + 0.10 * (ny - 0.54)) < 0.04 and abs(dy) < 0.24
+            if pinch and (x + y) % 3 == 0:
+                continue
+
+            valid.add((x, y))
+    return valid
+
+
+def _coffee_pot_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            body = 0.22 <= nx <= 0.74 and 0.34 <= ny <= 0.82
+            lid = 0.30 <= nx <= 0.68 and 0.26 <= ny <= 0.34
+            knob = ((nx - 0.49) ** 2) / (0.04 * 0.04) + ((ny - 0.22) ** 2) / (0.03 * 0.03) <= 1.0
+
+            dx = nx - 0.80
+            dy = ny - 0.56
+            handle_outer = dx * dx + dy * dy <= 0.13 * 0.13
+            handle_inner = dx * dx + dy * dy <= 0.075 * 0.075
+            handle = handle_outer and not handle_inner and 0.44 <= ny <= 0.72 and nx >= 0.72
+
+            spout = 0.74 <= nx <= 0.90 and 0.48 <= ny <= 0.60
+            if body or lid or knob or handle or spout:
+                valid.add((x, y))
+    return valid
+
+
+def _croissant_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            dx = nx - 0.5
+            dy = ny - 0.58
+            outer = (dx * dx) / (0.34 * 0.34) + (dy * dy) / (0.26 * 0.26) <= 1.0
+            inner = (dx * dx) / (0.22 * 0.22) + ((dy + 0.02) * (dy + 0.02)) / (0.14 * 0.14) <= 1.0
+
+            left_tip = ((nx - 0.22) ** 2) / (0.10 * 0.10) + ((ny - 0.60) ** 2) / (0.06 * 0.06) <= 1.0
+            right_tip = ((nx - 0.78) ** 2) / (0.10 * 0.10) + ((ny - 0.60) ** 2) / (0.06 * 0.06) <= 1.0
+
+            if (outer and not inner) or left_tip or right_tip:
+                valid.add((x, y))
+    return valid
+
+
+def _muffin_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            top = ((nx - 0.5) ** 2) / (0.30 * 0.30) + ((ny - 0.44) ** 2) / (0.20 * 0.20) <= 1.0
+            cup = 0.30 <= nx <= 0.70 and 0.52 <= ny <= 0.84
+            cup_taper = 0.02 <= abs(nx - 0.5) <= 0.22 and 0.52 <= ny <= 0.84
+
+            if top or cup or cup_taper:
+                valid.add((x, y))
+    return valid
+
+
+def _milk_pitcher_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            body = 0.30 <= nx <= 0.68 and 0.28 <= ny <= 0.84
+            spout = 0.68 <= nx <= 0.82 and 0.28 <= ny <= 0.42
+
+            dx = nx - 0.76
+            dy = ny - 0.58
+            handle_outer = dx * dx + dy * dy <= 0.12 * 0.12
+            handle_inner = dx * dx + dy * dy <= 0.07 * 0.07
+            handle = handle_outer and not handle_inner and 0.46 <= ny <= 0.70 and nx >= 0.66
+
+            taper = 0.30 <= nx <= 0.68 and ny > 0.60 and abs(nx - 0.49) <= (0.24 - (ny - 0.60) * 0.10)
+            if body or spout or handle or taper:
+                valid.add((x, y))
+    return valid
+
+
+def _notebook_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            body = 0.20 <= nx <= 0.82 and 0.18 <= ny <= 0.86
+            if not body:
+                continue
+
+            # Small spiral perforation cutouts on the left edge.
+            hole_col = 0.23 <= nx <= 0.28
+            hole_row = any(abs(ny - center) < 0.025 for center in (0.26, 0.36, 0.46, 0.56, 0.66, 0.76))
+            if hole_col and hole_row:
+                continue
+
+            valid.add((x, y))
+    return valid
+
+
+def _headphones_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            dx = nx - 0.50
+            dy = ny - 0.52
+            band_outer = (dx * dx) / (0.30 * 0.30) + (dy * dy) / (0.30 * 0.30) <= 1.0
+            band_inner = (dx * dx) / (0.23 * 0.23) + (dy * dy) / (0.23 * 0.23) <= 1.0
+            top_band = band_outer and not band_inner and ny <= 0.58
+
+            left_cup = 0.22 <= nx <= 0.34 and 0.52 <= ny <= 0.82
+            right_cup = 0.66 <= nx <= 0.78 and 0.52 <= ny <= 0.82
+            bridge_left = 0.30 <= nx <= 0.36 and 0.52 <= ny <= 0.62
+            bridge_right = 0.64 <= nx <= 0.70 and 0.52 <= ny <= 0.62
+
+            if top_band or left_cup or right_cup or bridge_left or bridge_right:
+                valid.add((x, y))
+    return valid
+
+
+def _laptop_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            screen = 0.24 <= nx <= 0.76 and 0.18 <= ny <= 0.56
+            hinge = 0.32 <= nx <= 0.68 and 0.56 <= ny <= 0.62
+            base = 0.18 <= nx <= 0.82 and 0.62 <= ny <= 0.80
+
+            if screen or hinge or base:
+                valid.add((x, y))
+    return valid
+
+
+def _sun_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+
+            dx = nx - 0.5
+            dy = ny - 0.54
+            core = dx * dx + dy * dy <= 0.18 * 0.18
+
+            ray_h = abs(dy) < 0.05 and abs(dx) < 0.33
+            ray_v = abs(dx) < 0.05 and abs(dy) < 0.30
+            ray_d1 = abs((dx - dy)) < 0.05 and abs(dx) + abs(dy) < 0.46
+            ray_d2 = abs((dx + dy)) < 0.05 and abs(dx) + abs(dy) < 0.46
+
+            if core or ray_h or ray_v or ray_d1 or ray_d2:
+                valid.add((x, y))
+    return valid
+
+
+def _circle_mask(width: int, height: int) -> set[Cell]:
+    valid: set[Cell] = set()
+    for y in range(height):
+        for x in range(width):
+            nx = (x + 0.5) / width
+            ny = (y + 0.5) / height
+            dx = nx - 0.5
+            dy = ny - 0.54
+            if dx * dx + dy * dy <= 0.34 * 0.34:
+                valid.add((x, y))
+    return valid
+
+
+def _shape_mask(shape: MazeShape, width: int, height: int) -> set[Cell]:
+    if shape == "rectangle":
+        return {(x, y) for y in range(height) for x in range(width)}
+    if shape == "coffee-cup":
+        return _coffee_cup_mask(width, height)
+    if shape == "coffee-bean":
+        return _coffee_bean_mask(width, height)
+    if shape == "coffee-pot":
+        return _coffee_pot_mask(width, height)
+    if shape == "croissant":
+        return _croissant_mask(width, height)
+    if shape == "muffin":
+        return _muffin_mask(width, height)
+    if shape == "milk-pitcher":
+        return _milk_pitcher_mask(width, height)
+    if shape == "notebook":
+        return _notebook_mask(width, height)
+    if shape == "headphones":
+        return _headphones_mask(width, height)
+    if shape == "sun":
+        return _sun_mask(width, height)
+    if shape == "circle":
+        return _circle_mask(width, height)
+    return _laptop_mask(width, height)
 
 
 def _largest_connected_component(valid_cells: set[Cell], width: int, height: int) -> set[Cell]:
@@ -336,8 +572,8 @@ def _draw_finish_cup(art: Artwork, cx: float, cy: float, size: float) -> None:
 def generate_maze(
     seed: int | None,
     output_dir: Path,
-    width: int = 12,
-    height: int = 16,
+    width: int = 24,
+    height: int = 24,
     difficulty: Difficulty = "medium",
     shape: MazeShape = "coffee-cup",
     title: str = "Espresso Escape Maze",
@@ -353,13 +589,26 @@ def generate_maze(
         raise ValueError("Maze width and height must be at least 3.")
     if difficulty not in {"easy", "medium", "hard"}:
         raise ValueError("difficulty must be one of: easy, medium, hard")
-    if shape not in {"coffee-cup", "rectangle"}:
-        raise ValueError("shape must be one of: coffee-cup, rectangle")
+    allowed_shapes = {
+        "coffee-cup",
+        "coffee-bean",
+        "coffee-pot",
+        "croissant",
+        "muffin",
+        "milk-pitcher",
+        "notebook",
+        "headphones",
+        "laptop",
+        "sun",
+        "circle",
+        "rectangle",
+    }
+    if shape not in allowed_shapes:
+        raise ValueError(
+            "shape must be one of: coffee-cup, coffee-bean, coffee-pot, croissant, muffin, milk-pitcher, notebook, headphones, laptop, sun, circle, rectangle"
+        )
 
-    if shape == "coffee-cup":
-        valid_cells = _largest_connected_component(_coffee_cup_mask(width, height), width, height)
-    else:
-        valid_cells = {(x, y) for y in range(height) for x in range(width)}
+    valid_cells = _largest_connected_component(_shape_mask(shape, width, height), width, height)
     if not valid_cells:
         raise RuntimeError("Maze shape produced no valid cells.")
 
@@ -418,10 +667,28 @@ def _main() -> None:
     parser = argparse.ArgumentParser(description="Generate a coffee-themed maze page.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed for reproducibility")
     parser.add_argument("--output-dir", type=Path, default=Path("coffee_activity_generator/exports"))
-    parser.add_argument("--width", type=int, default=12, help="Maze width in cells")
-    parser.add_argument("--height", type=int, default=16, help="Maze height in cells")
+    parser.add_argument("--width", type=int, default=24, help="Maze width in cells")
+    parser.add_argument("--height", type=int, default=24, help="Maze height in cells")
     parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="medium")
-    parser.add_argument("--shape", choices=["coffee-cup", "rectangle"], default="coffee-cup", help="Maze silhouette")
+    parser.add_argument(
+        "--shape",
+        choices=[
+            "coffee-cup",
+            "coffee-bean",
+            "coffee-pot",
+            "croissant",
+            "muffin",
+            "milk-pitcher",
+            "notebook",
+            "headphones",
+            "laptop",
+            "sun",
+            "circle",
+            "rectangle",
+        ],
+        default="coffee-cup",
+        help="Maze silhouette",
+    )
     parser.add_argument("--title", default="Espresso Escape Maze", help="Title shown above the maze")
     parser.add_argument(
         "--subtitle",
